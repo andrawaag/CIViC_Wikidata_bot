@@ -1,20 +1,24 @@
 __author__ = 'andra'
 
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/../../ProteinBoxBot_Core")
 from pprint import pprint
 import requests
 from SPARQLWrapper import SPARQLWrapper, JSON
-import ProteinBoxBot_Core.PBB_Core as PBB_Core
-
-import ProteinBoxBot_Core.PBB_login as PBB_login
+from wikidataintegrator import wdi_core, wdi_login, wdi_helpers, wdi_property_store
 from time import gmtime, strftime
 import copy
 import traceback
 import time
+import sys
+import os
 
-logincreds = PBB_login.WDLogin("ProteinBoxBot", os.environ['wikidataApi'])
+logincreds = wdi_login.WDLogin("ProteinBoxBot", os.environ['wikidataApi'])
+
+wdi_property_store.wd_properties['P3329'] = {
+        'datatype': 'string',
+        'name': 'CIViC ID',
+        'domain': ['genes'],
+        'core_id': 'True'
+    }
 
 # chromosomes
 #Chromosomes dict
@@ -83,19 +87,15 @@ for record in variant_data['records']:
     fast_run_base_filter = {'P3329': ''}
     fast_run = True
     print(record['id'])
-    # Reference section
-    # Prepare references
-    # variant_id = "499"
-    # variant_id = "183"
     variant_id = str(record['id'])
     # variant_id = "12"
-    refStatedIn = PBB_Core.WDItemID(value="Q27612411", prop_nr='P248', is_reference=True)
+    refStatedIn =  wdi_core.WDItemID(value="Q27612411", prop_nr='P248', is_reference=True)
     timeStringNow = strftime("+%Y-%m-%dT00:00:00Z", gmtime())
-    refRetrieved = PBB_Core.WDTime(timeStringNow, prop_nr='P813', is_reference=True)
-    refReferenceURL = PBB_Core.WDUrl("https://civic.genome.wustl.edu/links/variants/"+variant_id, prop_nr="P854", is_reference=True)
+    refRetrieved =  wdi_core.WDTime(timeStringNow, prop_nr='P813', is_reference=True)
+    refReferenceURL =  wdi_core.WDUrl("https://civic.genome.wustl.edu/links/variants/"+variant_id, prop_nr="P854", is_reference=True)
     variant_reference = [refStatedIn, refRetrieved, refReferenceURL]
 
-    genomeBuildQualifier = PBB_Core.WDItemID(value="Q21067546", prop_nr='P659', is_qualifier=True)
+    genomeBuildQualifier =  wdi_core.WDItemID(value="Q21067546", prop_nr='P659', is_qualifier=True)
 
 
     r = requests.get('https://civic.genome.wustl.edu/api/variants/'+variant_id)
@@ -120,7 +120,7 @@ for record in variant_data['records']:
     sparql.setReturnFormat(JSON)
     results = sparql.query().convert()
     for result in results["results"]["bindings"]:
-       prep['P3433'] = [PBB_Core.WDItemID(value=result["item"]["value"].replace("http://www.wikidata.org/entity/", ""), prop_nr='P3433', references=[copy.deepcopy(variant_reference)])]
+       prep['P3433'] = [ wdi_core.WDItemID(value=result["item"]["value"].replace("http://www.wikidata.org/entity/", ""), prop_nr='P3433', references=[copy.deepcopy(variant_reference)])]
        print("wd entrez:" + result["item"]["value"].replace("http://www.wikidata.org/entity/", ""))
 
 
@@ -128,23 +128,23 @@ for record in variant_data['records']:
     partof = variant_data["entrez_id"]
 
     # variant_id
-    prep['P3329'] = [PBB_Core.WDString(value=variant_id, prop_nr='P3329', references=[copy.deepcopy(variant_reference)])]
+    prep['P3329'] = [ wdi_core.WDString(value=variant_id, prop_nr='P3329', references=[copy.deepcopy(variant_reference)])]
 
 
     #coordinates
     coordinates = variant_data["coordinates"]
     if coordinates["chromosome"] != None:
-        prep['P1057'] = [PBB_Core.WDItemID(value=chromosomes[coordinates["chromosome"]], prop_nr='P1057', references=[copy.deepcopy(variant_reference)], qualifiers=[copy.deepcopy(genomeBuildQualifier)])]
+        prep['P1057'] = [ wdi_core.WDItemID(value=chromosomes[coordinates["chromosome"]], prop_nr='P1057', references=[copy.deepcopy(variant_reference)], qualifiers=[copy.deepcopy(genomeBuildQualifier)])]
         if coordinates["chromosome2"] != None:
-            prep['P1057'].append(PBB_Core.WDItemID(value=chromosomes[coordinates["chromosome2"]], prop_nr='P1057', references=[copy.deepcopy(variant_reference)], qualifiers=[copy.deepcopy(genomeBuildQualifier)]))
+            prep['P1057'].append( wdi_core.WDItemID(value=chromosomes[coordinates["chromosome2"]], prop_nr='P1057', references=[copy.deepcopy(variant_reference)], qualifiers=[copy.deepcopy(genomeBuildQualifier)]))
 
         # genomic start
-        prep['P644'] = [PBB_Core.WDString(value=str(coordinates["start"]), prop_nr='P644', references=[copy.deepcopy(variant_reference)], qualifiers=[copy.deepcopy(genomeBuildQualifier)])]
-        prep['P645'] = [PBB_Core.WDString(value=str(coordinates["stop"]), prop_nr='P645', references=[copy.deepcopy(variant_reference)], qualifiers=[copy.deepcopy(genomeBuildQualifier)])]
+        prep['P644'] = [ wdi_core.WDString(value=str(coordinates["start"]), prop_nr='P644', references=[copy.deepcopy(variant_reference)], qualifiers=[copy.deepcopy(genomeBuildQualifier)])]
+        prep['P645'] = [ wdi_core.WDString(value=str(coordinates["stop"]), prop_nr='P645', references=[copy.deepcopy(variant_reference)], qualifiers=[copy.deepcopy(genomeBuildQualifier)])]
 
         if coordinates["start2"] != None:
-            prep['P644'].append(PBB_Core.WDString(value=str(coordinates["start2"]), prop_nr='P644', references=[copy.deepcopy(variant_reference)], qualifiers=[copy.deepcopy(genomeBuildQualifier)]))
-            prep['P645'].append(PBB_Core.WDString(value=str(coordinates["stop2"]), prop_nr='P645', references=[copy.deepcopy(variant_reference)], qualifiers=[copy.deepcopy(genomeBuildQualifier)]))
+            prep['P644'].append( wdi_core.WDString(value=str(coordinates["start2"]), prop_nr='P644', references=[copy.deepcopy(variant_reference)], qualifiers=[copy.deepcopy(genomeBuildQualifier)]))
+            prep['P645'].append( wdi_core.WDString(value=str(coordinates["stop2"]), prop_nr='P645', references=[copy.deepcopy(variant_reference)], qualifiers=[copy.deepcopy(genomeBuildQualifier)]))
 
     query = """
             SELECT DISTINCT ?item  ?itemLabel ?alias
@@ -174,7 +174,7 @@ for record in variant_data['records']:
     for variant_type in variant_data["variant_types"]:
         if variant_type["name"] == "N/A":
             continue
-        prep['P31'].append(PBB_Core.WDItemID(value=seqO[variant_type["display_name"]], prop_nr='P31', references=[copy.deepcopy(variant_reference)]))
+        prep['P31'].append( wdi_core.WDItemID(value=seqO[variant_type["display_name"]], prop_nr='P31', references=[copy.deepcopy(variant_reference)]))
 
         print(variant_type["display_name"])
 
@@ -258,13 +258,13 @@ for record in variant_data['records']:
 
             for result in results["results"]["bindings"]:
                pubmed_entry = result["item"]["value"].replace("http://www.wikidata.org/entity/", "")
-               refStatedIn = PBB_Core.WDItemID(value=pubmed_entry, prop_nr='P248', is_reference=True)
+               refStatedIn =  wdi_core.WDItemID(value=pubmed_entry, prop_nr='P248', is_reference=True)
                references.append(refStatedIn)
 
             timeStringNow = strftime("+%Y-%m-%dT00:00:00Z", gmtime())
-            refRetrieved = PBB_Core.WDTime(timeStringNow, prop_nr='P813', is_reference=True)
+            refRetrieved =  wdi_core.WDTime(timeStringNow, prop_nr='P813', is_reference=True)
             #pubmed_references.append(refRetrieved)
-            #refReferenceURL = PBB_Core.WDUrl("https://civic.genome.wustl.edu/links/variants/"+variant_id, prop_nr="P854", is_reference=True)
+            #refReferenceURL =  wdi_core.WDUrl("https://civic.genome.wustl.edu/links/variants/"+variant_id, prop_nr="P854", is_reference=True)
             #pubmed_references.append(refReferenceURL)
 
             # Positive therapeutic predictor
@@ -415,67 +415,67 @@ for record in variant_data['records']:
         for drug in evidence["P3354"].keys():
             for disease in evidence["P3354"][drug].keys():
                 if disease != None:
-                    references = [PBB_Core.WDTime(timeStringNow, prop_nr='P813', is_reference=True)]
-                    disp_references = [PBB_Core.WDTime(timeStringNow, prop_nr='P813', is_reference=True)]
-                    disease_qualifier = [PBB_Core.WDItemID(value=disease, prop_nr='P2175', is_qualifier=True)]
+                    references = [ wdi_core.WDTime(timeStringNow, prop_nr='P813', is_reference=True)]
+                    disp_references = [ wdi_core.WDTime(timeStringNow, prop_nr='P813', is_reference=True)]
+                    disease_qualifier = [ wdi_core.WDItemID(value=disease, prop_nr='P2175', is_qualifier=True)]
                     if "stated_in" in evidence["P3354"][drug][disease].keys():
                         for statedin in evidence["P3354"][drug][disease]["stated_in"]["references"]:
-                            references.append(PBB_Core.WDItemID(value=statedin, prop_nr='P248', is_reference=True))
+                            references.append( wdi_core.WDItemID(value=statedin, prop_nr='P248', is_reference=True))
                         for evidence_id in evidence["P3354"][drug][disease]["stated_in"]["id"]:
-                            references.append(PBB_Core.WDUrl("https://civic.genome.wustl.edu/links/evidence/"+evidence_id, prop_nr="P854", is_reference=True))
-                        prep["P3354"].append(PBB_Core.WDItemID(value=drug, prop_nr='P3354', references=[copy.deepcopy(references)] , qualifiers=copy.deepcopy(disease_qualifier)))
+                            references.append( wdi_core.WDUrl("https://civic.genome.wustl.edu/links/evidence/"+evidence_id, prop_nr="P854", is_reference=True))
+                        prep["P3354"].append( wdi_core.WDItemID(value=drug, prop_nr='P3354', references=[copy.deepcopy(references)] , qualifiers=copy.deepcopy(disease_qualifier)))
 
                     if "disputed_by" in evidence["P3354"][drug][disease].keys():
                         for disputedby in evidence["P3354"][drug][disease]["disputed_by"]["references"]:
-                            disease_qualifier.append(PBB_Core.WDItemID(value=disputedby, prop_nr='P1310', is_qualifier=True))
-                            disp_references.append(PBB_Core.WDItemID(value=disputedby, prop_nr='P248', is_reference=True))
+                            disease_qualifier.append( wdi_core.WDItemID(value=disputedby, prop_nr='P1310', is_qualifier=True))
+                            disp_references.append( wdi_core.WDItemID(value=disputedby, prop_nr='P248', is_reference=True))
                         for evidence_id in evidence["P3354"][drug][disease]["disputed_by"]["id"]:
-                            disp_references.append(PBB_Core.WDUrl("https://civic.genome.wustl.edu/links/evidence/"+evidence_id, prop_nr="P854", is_reference=True))
-                        prep["P3354"].append(PBB_Core.WDItemID(value=drug, prop_nr='P3354', references=[copy.deepcopy(disp_references)] , qualifiers=copy.deepcopy(disease_qualifier)))
+                            disp_references.append( wdi_core.WDUrl("https://civic.genome.wustl.edu/links/evidence/"+evidence_id, prop_nr="P854", is_reference=True))
+                        prep["P3354"].append( wdi_core.WDItemID(value=drug, prop_nr='P3354', references=[copy.deepcopy(disp_references)] , qualifiers=copy.deepcopy(disease_qualifier)))
 
     if len(evidence["P3355"]) > 0:
         prep["P3355"] = []
         for drug in evidence["P3355"].keys():
-            references = [PBB_Core.WDTime(timeStringNow, prop_nr='P813', is_reference=True)]
-            disp_references = [PBB_Core.WDTime(timeStringNow, prop_nr='P813', is_reference=True)]
+            references = [ wdi_core.WDTime(timeStringNow, prop_nr='P813', is_reference=True)]
+            disp_references = [ wdi_core.WDTime(timeStringNow, prop_nr='P813', is_reference=True)]
             for disease in evidence["P3355"][drug].keys():
                 if disease != None:
-                    disease_qualifier = [PBB_Core.WDItemID(value=disease, prop_nr='P2175', is_qualifier=True)]
+                    disease_qualifier = [ wdi_core.WDItemID(value=disease, prop_nr='P2175', is_qualifier=True)]
                     if "stated_in" in evidence["P3355"][drug][disease].keys():
                         for statedin in evidence["P3355"][drug][disease]["stated_in"]["references"]:
-                            references.append(PBB_Core.WDItemID(value=statedin, prop_nr='P248', is_reference=True))
+                            references.append( wdi_core.WDItemID(value=statedin, prop_nr='P248', is_reference=True))
                         for evidence_id in evidence["P3355"][drug][disease]["stated_in"]["id"]:
-                            references.append(PBB_Core.WDUrl("https://civic.genome.wustl.edu/links/evidence/"+evidence_id, prop_nr="P854", is_reference=True))
-                        prep["P3355"].append(PBB_Core.WDItemID(value=drug, prop_nr='P3355', references=[copy.deepcopy(references)] , qualifiers=copy.deepcopy(disease_qualifier)))
+                            references.append( wdi_core.WDUrl("https://civic.genome.wustl.edu/links/evidence/"+evidence_id, prop_nr="P854", is_reference=True))
+                        prep["P3355"].append( wdi_core.WDItemID(value=drug, prop_nr='P3355', references=[copy.deepcopy(references)] , qualifiers=copy.deepcopy(disease_qualifier)))
 
                     if "disputed_by" in evidence["P3355"][drug][disease].keys():
                         for disputedby in evidence["P3355"][drug][disease]["disputed_by"]["references"]:
-                            disp_references.append(PBB_Core.WDItemID(value=disputedby, prop_nr='P248', is_reference=True))
-                            disease_qualifier.append(PBB_Core.WDItemID(value=disputedby, prop_nr='P1310', is_qualifier=True))
+                            disp_references.append( wdi_core.WDItemID(value=disputedby, prop_nr='P248', is_reference=True))
+                            disease_qualifier.append( wdi_core.WDItemID(value=disputedby, prop_nr='P1310', is_qualifier=True))
                         for evidence_id in evidence["P3355"][drug][disease]["disputed_by"]["id"]:
-                            disp_references.append(PBB_Core.WDUrl("https://civic.genome.wustl.edu/links/evidence/"+evidence_id, prop_nr="P854", is_reference=True))
-                        prep["P3355"].append(PBB_Core.WDItemID(value=drug, prop_nr='P3355', references=[copy.deepcopy(disp_references)] , qualifiers=copy.deepcopy(disease_qualifier)))
+                            disp_references.append( wdi_core.WDUrl("https://civic.genome.wustl.edu/links/evidence/"+evidence_id, prop_nr="P854", is_reference=True))
+                        prep["P3355"].append( wdi_core.WDItemID(value=drug, prop_nr='P3355', references=[copy.deepcopy(disp_references)] , qualifiers=copy.deepcopy(disease_qualifier)))
 
 
     if len(evidence["P3356"]) > 0:
         prep["P3356"] = []
         for disease in evidence["P3356"].keys():
             if disease != None:
-                references = [PBB_Core.WDTime(timeStringNow, prop_nr='P813', is_reference=True)]
-                disp_references = [PBB_Core.WDTime(timeStringNow, prop_nr='P813', is_reference=True)]
+                references = [ wdi_core.WDTime(timeStringNow, prop_nr='P813', is_reference=True)]
+                disp_references = [ wdi_core.WDTime(timeStringNow, prop_nr='P813', is_reference=True)]
                 if "stated_in" in evidence["P3356"][disease]["references"].keys():
-                    references.append(PBB_Core.WDUrl("https://civic.genome.wustl.edu/links/evidence/"+evidence["P3356"][disease]["id"], prop_nr="P854", is_reference=True))
+                    references.append( wdi_core.WDUrl("https://civic.genome.wustl.edu/links/evidence/"+evidence["P3356"][disease]["id"], prop_nr="P854", is_reference=True))
                     for statedin in evidence["P3356"][disease]["references"]["stated_in"]:
-                        references.append(PBB_Core.WDItemID(value=statedin, prop_nr='P248', is_reference=True))
-                    prep["P3356"].append(PBB_Core.WDItemID(value=disease, prop_nr='P3356', references=[copy.deepcopy(references)]))
+                        references.append( wdi_core.WDItemID(value=statedin, prop_nr='P248', is_reference=True))
+                    prep["P3356"].append( wdi_core.WDItemID(value=disease, prop_nr='P3356', references=[copy.deepcopy(references)]))
 
                 if "disputed_by" in evidence["P3356"][disease]["references"].keys():
-                    disp_references.append(PBB_Core.WDUrl("https://civic.genome.wustl.edu/links/evidence/"+evidence["P3356"][disease]["id"], prop_nr="P854", is_reference=True))
+                    disp_references.append( wdi_core.WDUrl("https://civic.genome.wustl.edu/links/evidence/"+evidence["P3356"][disease]["id"], prop_nr="P854", is_reference=True))
                     disputed_qualifier = []
                     for disputedby in evidence["P3356"][disease]["references"]["disputed_by"]:
-                        disputed_qualifier.append(PBB_Core.WDItemID(value=disputedby, prop_nr='P1310', is_qualifier=True))
-                        disp_references.append(PBB_Core.WDItemID(value=disputedby, prop_nr='P248', is_reference=True))
-                    prep["P3356"].append(PBB_Core.WDItemID(value=disease, prop_nr='P3356', references=[copy.deepcopy(disp_references)], qualifiers=copy.deepcopy(disputed_qualifier)))
+                        disputed_qualifier.append( wdi_core.WDItemID(value=disputedby, prop_nr='P1310', is_qualifier=True))
+                        disp_references.append( wdi_core.WDItemID(value=disputedby, prop_nr='P248', is_reference=True))
+                    prep["P3356"].append( wdi_core.WDItemID(value=disease, prop_nr='P3356', references=[copy.deepcopy(disp_references)], qualifiers=copy.deepcopy(disputed_qualifier)))
 
 
     if len(evidence["P3357"]) > 0:
@@ -483,43 +483,43 @@ for record in variant_data['records']:
 
         for disease in evidence["P3357"].keys():
             if disease != None:
-                references = [PBB_Core.WDTime(timeStringNow, prop_nr='P813', is_reference=True)]
-                disp_references = [PBB_Core.WDTime(timeStringNow, prop_nr='P813', is_reference=True)]
+                references = [ wdi_core.WDTime(timeStringNow, prop_nr='P813', is_reference=True)]
+                disp_references = [ wdi_core.WDTime(timeStringNow, prop_nr='P813', is_reference=True)]
 
                 if "stated_in" in evidence["P3357"][disease]["references"].keys():
-                    references.append(PBB_Core.WDUrl("https://civic.genome.wustl.edu/links/evidence/"+evidence["P3357"][disease]["id"], prop_nr="P854", is_reference=True))
+                    references.append( wdi_core.WDUrl("https://civic.genome.wustl.edu/links/evidence/"+evidence["P3357"][disease]["id"], prop_nr="P854", is_reference=True))
                     for statedin in evidence["P3357"][disease]["references"]["stated_in"]:
-                        references.append(PBB_Core.WDItemID(value=statedin, prop_nr='P248', is_reference=True))
-                    prep["P3357"].append(PBB_Core.WDItemID(value=disease, prop_nr='P3357', references=[copy.deepcopy(references)]))
+                        references.append( wdi_core.WDItemID(value=statedin, prop_nr='P248', is_reference=True))
+                    prep["P3357"].append( wdi_core.WDItemID(value=disease, prop_nr='P3357', references=[copy.deepcopy(references)]))
 
                 if "disputed_by" in evidence["P3357"][disease]["references"].keys():
                     disputed_qualifier = []
-                    disp_references.append(PBB_Core.WDUrl("https://civic.genome.wustl.edu/links/evidence/"+evidence["P3357"][disease]["id"], prop_nr="P854", is_reference=True))
+                    disp_references.append( wdi_core.WDUrl("https://civic.genome.wustl.edu/links/evidence/"+evidence["P3357"][disease]["id"], prop_nr="P854", is_reference=True))
                     for disputedby in evidence["P3357"][disease]["references"]["disputed_by"]:
-                        disp_references.append(PBB_Core.WDItemID(value=disputedby, prop_nr='P248', is_reference=True))
-                        disputed_qualifier.append(PBB_Core.WDItemID(value=disputedby, prop_nr='P1310', is_qualifier=True))
-                    prep["P3357"].append(PBB_Core.WDItemID(value=disease, prop_nr='P3357', references=[copy.deepcopy(disp_references)], qualifiers=copy.deepcopy(disputed_qualifier)))
+                        disp_references.append( wdi_core.WDItemID(value=disputedby, prop_nr='P248', is_reference=True))
+                        disputed_qualifier.append( wdi_core.WDItemID(value=disputedby, prop_nr='P1310', is_qualifier=True))
+                    prep["P3357"].append( wdi_core.WDItemID(value=disease, prop_nr='P3357', references=[copy.deepcopy(disp_references)], qualifiers=copy.deepcopy(disputed_qualifier)))
 
     if len(evidence["P3358"]) > 0:
         prep["P3358"] = []
 
         for disease in evidence["P3358"].keys():
             if disease != None:
-                references = [PBB_Core.WDTime(timeStringNow, prop_nr='P813', is_reference=True)]
-                disp_references = [PBB_Core.WDTime(timeStringNow, prop_nr='P813', is_reference=True)]
+                references = [ wdi_core.WDTime(timeStringNow, prop_nr='P813', is_reference=True)]
+                disp_references = [ wdi_core.WDTime(timeStringNow, prop_nr='P813', is_reference=True)]
 
                 if "stated_in" in evidence["P3358"][disease]["references"].keys():
-                    references.append(PBB_Core.WDUrl("https://civic.genome.wustl.edu/links/evidence/"+evidence["P3358"][disease]["id"], prop_nr="P854", is_reference=True))
+                    references.append( wdi_core.WDUrl("https://civic.genome.wustl.edu/links/evidence/"+evidence["P3358"][disease]["id"], prop_nr="P854", is_reference=True))
                     for statedin in evidence["P3358"][disease]["references"]["stated_in"]:
-                        references.append(PBB_Core.WDItemID(value=statedin, prop_nr='P248', is_reference=True))
-                    prep["P3358"].append(PBB_Core.WDItemID(value=disease, prop_nr='P3358', references=[copy.deepcopy(references)]))
+                        references.append( wdi_core.WDItemID(value=statedin, prop_nr='P248', is_reference=True))
+                    prep["P3358"].append( wdi_core.WDItemID(value=disease, prop_nr='P3358', references=[copy.deepcopy(references)]))
                 if "disputed_by" in evidence["P3358"][disease]["references"].keys():
                     disputed_qualifier = []
-                    disp_references.append(PBB_Core.WDUrl("https://civic.genome.wustl.edu/links/evidence/"+evidence["P3358"][disease]["id"], prop_nr="P854", is_reference=True))
+                    disp_references.append( wdi_core.WDUrl("https://civic.genome.wustl.edu/links/evidence/"+evidence["P3358"][disease]["id"], prop_nr="P854", is_reference=True))
                     for disputedby in evidence["P3358"][disease]["references"]["disputed_by"]:
-                        disputed_qualifier.append(PBB_Core.WDItemID(value=disputedby, prop_nr='P1310', is_qualifier=True))
-                        disp_references.append(PBB_Core.WDItemID(value=disputedby, prop_nr='P248', is_reference=True))
-                    prep["P3358"].append(PBB_Core.WDItemID(value=disease, prop_nr='P3358', references=[copy.deepcopy(disp_references)], qualifiers=copy.deepcopy(disputed_qualifier)))
+                        disputed_qualifier.append( wdi_core.WDItemID(value=disputedby, prop_nr='P1310', is_qualifier=True))
+                        disp_references.append( wdi_core.WDItemID(value=disputedby, prop_nr='P248', is_reference=True))
+                    prep["P3358"].append( wdi_core.WDItemID(value=disease, prop_nr='P3358', references=[copy.deepcopy(disp_references)], qualifiers=copy.deepcopy(disputed_qualifier)))
 
     if len(evidence["P3359"]) > 0:
         prep["P3359"] = []
@@ -527,21 +527,21 @@ for record in variant_data['records']:
 
         for disease in evidence["P3359"].keys():
             if disease != None:
-                references = [PBB_Core.WDTime(timeStringNow, prop_nr='P813', is_reference=True)]
-                disp_references = [PBB_Core.WDTime(timeStringNow, prop_nr='P813', is_reference=True)]
+                references = [ wdi_core.WDTime(timeStringNow, prop_nr='P813', is_reference=True)]
+                disp_references = [ wdi_core.WDTime(timeStringNow, prop_nr='P813', is_reference=True)]
 
                 if "stated_in" in evidence["P3359"][disease]["references"].keys():
-                    references.append(PBB_Core.WDUrl("https://civic.genome.wustl.edu/links/evidence/"+evidence["P3359"][disease]["id"], prop_nr="P854", is_reference=True))
+                    references.append( wdi_core.WDUrl("https://civic.genome.wustl.edu/links/evidence/"+evidence["P3359"][disease]["id"], prop_nr="P854", is_reference=True))
                     for statedin in evidence["P3359"][disease]["references"]["stated_in"]:
-                        references.append(PBB_Core.WDItemID(value=statedin, prop_nr='P248', is_reference=True))
-                    prep["P3359"].append(PBB_Core.WDItemID(value=disease, prop_nr='P3359', references=[copy.deepcopy(references)]))
+                        references.append( wdi_core.WDItemID(value=statedin, prop_nr='P248', is_reference=True))
+                    prep["P3359"].append( wdi_core.WDItemID(value=disease, prop_nr='P3359', references=[copy.deepcopy(references)]))
                 if "disputed_by" in evidence["P3359"][disease]["references"].keys():
                     disputed_qualifier = []
-                    disp_references.append(PBB_Core.WDUrl("https://civic.genome.wustl.edu/links/evidence/"+evidence["P3359"][disease]["id"], prop_nr="P854", is_reference=True))
+                    disp_references.append( wdi_core.WDUrl("https://civic.genome.wustl.edu/links/evidence/"+evidence["P3359"][disease]["id"], prop_nr="P854", is_reference=True))
                     for disputedby in evidence["P3359"][disease]["references"]["disputed_by"]:
-                        disputed_qualifier.append(PBB_Core.WDItemID(value=disputedby, prop_nr='P1310', is_qualifier=True))
-                        disp_references.append(PBB_Core.WDItemID(value=disputedby, prop_nr='P248', is_reference=True))
-                    prep["P3359"].append(PBB_Core.WDItemID(value=disease, prop_nr='P3359', references=[copy.deepcopy(disp_references)], qualifiers=copy.deepcopy(disputed_qualifier)))
+                        disputed_qualifier.append( wdi_core.WDItemID(value=disputedby, prop_nr='P1310', is_qualifier=True))
+                        disp_references.append( wdi_core.WDItemID(value=disputedby, prop_nr='P248', is_reference=True))
+                    prep["P3359"].append( wdi_core.WDItemID(value=disease, prop_nr='P3359', references=[copy.deepcopy(disp_references)], qualifiers=copy.deepcopy(disputed_qualifier)))
 
     data2add = []
     for key in prep.keys():
@@ -551,7 +551,8 @@ for record in variant_data['records']:
 
     pprint(prep)
     name = variant_data["name"]
-    wdPage = PBB_Core.WDItemEngine( item_name=name, data=data2add, server="www.wikidata.org", domain="genes", fast_run=fast_run, fast_run_base_filter=fast_run_base_filter)
+    wdPage =  wdi_core.WDItemEngine( item_name=name, data=data2add, server="www.wikidata.org", domain="genes", fast_run=fast_run, fast_run_base_filter=fast_run_base_filter)
+
     synonyms = []
     if name not in ignore_synonym_list:
         synonyms.append(name)
@@ -579,14 +580,16 @@ for record in variant_data['records']:
 
     wd_json_representation = wdPage.get_wd_json_representation()
 
-    pprint(wd_json_representation)
-
+    pprint(wdPage.get_wd_json_representation())
+    print("========")
+    # sys.exit()
     print(wdPage.write(logincreds))
+    sys.exit()
 
  # except Exception as e:
     """
                 print(traceback.format_exc())
-                PBB_Core.WDItemEngine.log('ERROR', '{main_data_id}, "{exception_type}", "{message}", {wd_id}, {duration}'.format(
+                 wdi_core.WDItemEngine.log('ERROR', '{main_data_id}, "{exception_type}", "{message}", {wd_id}, {duration}'.format(
                         main_data_id=variant_id,
                         exception_type=type(e),
                         message=e.__str__(),
