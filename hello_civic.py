@@ -1,18 +1,24 @@
 __author__ = 'andra'
 
+import copy
+import os
+import sys
 from pprint import pprint
+from time import gmtime, strftime
+import time
+import traceback
 import requests
 from SPARQLWrapper import SPARQLWrapper, JSON
-from wikidataintegrator import wdi_core, wdi_login, wdi_helpers, wdi_property_store
-from time import gmtime, strftime
-import copy
-import traceback
-import time
-import sys
-import os
+from wikidataintegrator import wdi_core, wdi_login, wdi_property_store
 
-logincreds = wdi_login.WDLogin("ProteinBoxBot", os.environ['wikidataApi'])
 
+###
+# Bot parameters
+###
+
+# bot account parameters i.e login and password
+#
+logincreds = wdi_login.WDLogin(os.environ['botaccount'], os.environ['wikidataApi'])
 wdi_property_store.wd_properties['P3329'] = {
         'datatype': 'string',
         'name': 'CIViC ID',
@@ -20,6 +26,9 @@ wdi_property_store.wd_properties['P3329'] = {
         'core_id': 'True'
     }
 
+###
+# Wikidate items id's used as constants
+###
 # chromosomes
 #Chromosomes dict
 chromosomes = dict()
@@ -83,7 +92,7 @@ ignore_synonym_list = [
 ]
 
 for record in variant_data['records']:
- # try:
+ try:
     fast_run_base_filter = {'P3329': ''}
     fast_run = True
     print(record['id'])
@@ -96,7 +105,6 @@ for record in variant_data['records']:
     variant_reference = [refStatedIn, refRetrieved, refReferenceURL]
 
     genomeBuildQualifier =  wdi_core.WDItemID(value="Q21067546", prop_nr='P659', is_qualifier=True)
-
 
     r = requests.get('https://civic.genome.wustl.edu/api/variants/'+variant_id)
     variant_data = r.json()
@@ -130,21 +138,22 @@ for record in variant_data['records']:
     # variant_id
     prep['P3329'] = [ wdi_core.WDString(value=variant_id, prop_nr='P3329', references=[copy.deepcopy(variant_reference)])]
 
-
     #coordinates
     coordinates = variant_data["coordinates"]
-    if coordinates["chromosome"] != None:
+    if coordinates["chromosome"] != None or '':
         prep['P1057'] = [ wdi_core.WDItemID(value=chromosomes[coordinates["chromosome"]], prop_nr='P1057', references=[copy.deepcopy(variant_reference)], qualifiers=[copy.deepcopy(genomeBuildQualifier)])]
-        if coordinates["chromosome2"] != None:
-            prep['P1057'].append( wdi_core.WDItemID(value=chromosomes[coordinates["chromosome2"]], prop_nr='P1057', references=[copy.deepcopy(variant_reference)], qualifiers=[copy.deepcopy(genomeBuildQualifier)]))
+        if coordinates["chromosome2"] != None :
+            if len(str(coordinates["chromosome2"])) > 0:
+                prep['P1057'].append( wdi_core.WDItemID(value=chromosomes[coordinates["chromosome2"]], prop_nr='P1057', references=[copy.deepcopy(variant_reference)], qualifiers=[copy.deepcopy(genomeBuildQualifier)]))
 
         # genomic start
         prep['P644'] = [ wdi_core.WDString(value=str(coordinates["start"]), prop_nr='P644', references=[copy.deepcopy(variant_reference)], qualifiers=[copy.deepcopy(genomeBuildQualifier)])]
         prep['P645'] = [ wdi_core.WDString(value=str(coordinates["stop"]), prop_nr='P645', references=[copy.deepcopy(variant_reference)], qualifiers=[copy.deepcopy(genomeBuildQualifier)])]
 
-        if coordinates["start2"] != None:
-            prep['P644'].append( wdi_core.WDString(value=str(coordinates["start2"]), prop_nr='P644', references=[copy.deepcopy(variant_reference)], qualifiers=[copy.deepcopy(genomeBuildQualifier)]))
-            prep['P645'].append( wdi_core.WDString(value=str(coordinates["stop2"]), prop_nr='P645', references=[copy.deepcopy(variant_reference)], qualifiers=[copy.deepcopy(genomeBuildQualifier)]))
+        if coordinates["start2"] != None :
+            if len(str(coordinates["start2"])) > 0:
+                prep['P644'].append( wdi_core.WDString(value=str(coordinates["start2"]), prop_nr='P644', references=[copy.deepcopy(variant_reference)], qualifiers=[copy.deepcopy(genomeBuildQualifier)]))
+                prep['P645'].append( wdi_core.WDString(value=str(coordinates["stop2"]), prop_nr='P645', references=[copy.deepcopy(variant_reference)], qualifiers=[copy.deepcopy(genomeBuildQualifier)]))
 
     query = """
             SELECT DISTINCT ?item  ?itemLabel ?alias
@@ -162,6 +171,7 @@ for record in variant_data['records']:
     sparql.setReturnFormat(JSON)
     results = sparql.query().convert()
     seqO = dict()
+
     for result in results["results"]["bindings"]:
         seqO[result["itemLabel"]["value"]] = result["item"]["value"].replace("http://www.wikidata.org/entity/", "")
         if "alias" in result.keys():
@@ -169,12 +179,13 @@ for record in variant_data['records']:
             seqO[result["alias"]["value"]] = result["item"]["value"].replace("http://www.wikidata.org/entity/", "")
         seqO[result["itemLabel"]["value"]] = result["item"]["value"].replace("http://www.wikidata.org/entity/", "")
         print("wd disease:" + result["item"]["value"].replace("http://www.wikidata.org/entity/", ""))
+    pprint(seqO)
 
     prep["P31"] = []
     for variant_type in variant_data["variant_types"]:
         if variant_type["name"] == "N/A":
             continue
-        prep['P31'].append( wdi_core.WDItemID(value=seqO[variant_type["display_name"]], prop_nr='P31', references=[copy.deepcopy(variant_reference)]))
+        prep['P31'].append( wdi_core.WDItemID(value=seqO[str(variant_type["display_name"])], prop_nr='P31', references=[copy.deepcopy(variant_reference)]))
 
         print(variant_type["display_name"])
 
@@ -194,8 +205,9 @@ for record in variant_data['records']:
         #if evidence_item["evidence_level"] == "A" or evidence_item["evidence_level"] == "B" or evidence_item["evidence_level"] == "C" :
             ## Disease
             Disease = None
-            if evidence_item["disease"]["doid"] != None or evidence_item["disease"]["doid"] != "":
-                print("DOID:"+evidence_item["disease"]["doid"])
+            pprint(evidence_item)
+            if evidence_item["disease"]["doid"] != None or "":
+                # print("DOID:"+evidence_item["disease"]["doid"])
 
                 query = """SELECT ?item ?itemLabel
                     WHERE
@@ -584,16 +596,15 @@ for record in variant_data['records']:
     print("========")
     # sys.exit()
     print(wdPage.write(logincreds))
-    sys.exit()
 
- # except Exception as e:
-    """
-                print(traceback.format_exc())
+
+ except Exception as e:
+                 print(traceback.format_exc())
                  wdi_core.WDItemEngine.log('ERROR', '{main_data_id}, "{exception_type}", "{message}", {wd_id}, {duration}'.format(
                         main_data_id=variant_id,
                         exception_type=type(e),
                         message=e.__str__(),
                         wd_id='-',
-                        duration=time.time()
-                    ))"" \
-    """
+                        duration=time()
+                    ))
+                 continue
